@@ -5,12 +5,29 @@ const LandingPage = ({ onJoin }) => {
   const [roomId, setRoomId] = useState('');
   const [name, setName] = useState('');
 
+  // 🚀 Your live Render URL
+  const BACKEND_URL = 'https://videocall-app-qpie.onrender.com';
+
   const handleCreate = async () => {
     if (!name.trim()) return alert("Please enter your name first!");
-    // Calling the Node.js backend to get a unique UUID
-    const response = await fetch('http://localhost:5000/create-room');
-    const data = await response.json();
-    onJoin(data.roomId, name);
+    
+    try {
+      // 1. Try to get a unique UUID from your Render backend
+      const response = await fetch(`${BACKEND_URL}/create-room`);
+      
+      if (!response.ok) throw new Error("Backend is waking up...");
+      
+      const data = await response.json();
+      onJoin(data.roomId, name);
+      
+    } catch (error) {
+      console.warn("Backend fetch failed, using local fallback:", error);
+      
+      // 2. FALLBACK: If the server is cold-starting, generate an ID locally
+      // This ensures the button always works even if Render is slow
+      const fallbackId = crypto.randomUUID().split('-')[0]; // Simple short ID
+      onJoin(fallbackId, name);
+    }
   };
 
   const handleJoinExisting = () => {

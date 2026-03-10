@@ -2,46 +2,45 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
 const RoomManager = require('./RoomManager');
 
-// 1. Initialize Express and Middleware
+// 1. Initialize Express
 const app = express();
 
-// Allow cross-origin requests from your Vite frontend (port 5173)
+// 2. Configure Middleware
 app.use(cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: "*", // Allows your Render frontend to talk to this backend
     methods: ["GET", "POST"]
 }));
 
-// 2. Create the HTTP Server
+// 3. Create HTTP Server
 const server = http.createServer(app);
 
-// 3. Initialize Socket.io with specific settings for WebRTC
+// 4. Initialize Socket.io (Declared ONLY ONCE)
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allows any origin for development; tighten this for production
+        origin: "*",
         methods: ["GET", "POST"]
     },
-    // Using websocket transport is more stable for WebRTC signaling
-    transports: ['websocket', 'polling'] 
+    transports: ['websocket', 'polling']
 });
 
-// 4. Basic Health Check Route
+// 5. API Routes
 app.get('/', (req, res) => {
-    res.send('Morallive Signaling Server is running.');
+    res.send('Morallive Signaling Server is Live.');
 });
 
-// 5. Room Creation Helper (Optional API endpoint)
+// This matches the fetch in your LandingPage.jsx
 app.get('/create-room', (req, res) => {
-    const { v4: uuidv4 } = require('uuid');
-    res.json({ roomId: uuidv4() });
+    const roomId = uuidv4();
+    console.log(`Room Created: ${roomId}`);
+    res.json({ roomId });
 });
 
 // 6. Socket connection handling
 io.on('connection', (socket) => {
-    console.log(`New connection: ${socket.id}`);
-
-    // Pass the socket and the io instance to your RoomManager logic
+    // Pass the socket to your RoomManager logic
     RoomManager(socket, io);
 });
 
@@ -49,7 +48,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log('-------------------------------------------');
-    console.log(`🚀 Morallive server running on port ${PORT}`);
-    console.log(`🔗 Local: http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🔗 Backend URL: https://videocall-app-qpie.onrender.com`);
     console.log('-------------------------------------------');
 });

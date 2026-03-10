@@ -6,9 +6,13 @@ import Peer from 'simple-peer';
 
 export const RoomContext = createContext();
 
-// Ensure your Node server is running on this port
-const socket = io('http://localhost:5000', {
-    transports: ['websocket'], // Forces websocket for better stability
+// 1. Point this to your LIVE Render backend
+const BACKEND_URL = "https://videocall-app-qpie.onrender.com";
+
+// Auto-switch between Live and Local for easier development
+const socket = io(BACKEND_URL, {
+    transports: ['websocket'],
+    withCredentials: true
 });
 
 export const RoomProvider = ({ children }) => {
@@ -19,11 +23,11 @@ export const RoomProvider = ({ children }) => {
     const [isCameraOff, setIsCameraOff] = useState(false);
 
     const userVideo = useRef();
-    const peersRef = useRef([]); // Keeps track of active Peer objects
+    const peersRef = useRef([]); 
     const socketRef = useRef(socket);
 
     const joinRoom = (roomId, userName) => {
-        // 1. Setup Camera and Mic
+        // Request Camera/Mic access
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then((currentStream) => {
                 setStream(currentStream);
@@ -31,10 +35,10 @@ export const RoomProvider = ({ children }) => {
                     userVideo.current.srcObject = currentStream;
                 }
 
-                // 2. Emit Join Event
+                // Tell the server we are joining
                 socketRef.current.emit('join-room', { roomId, userName });
 
-                // 3. Listen for existing users
+                // Signal handling for WebRTC
                 socketRef.current.on('all-users', (users) => {
                     const peersList = [];
                     users.forEach((userID) => {
@@ -45,25 +49,23 @@ export const RoomProvider = ({ children }) => {
                     setPeers(peersList);
                 });
 
-                // 4. Listen for someone new joining
                 socketRef.current.on('user-joined', (payload) => {
                     const peer = addPeer(payload.signal, payload.callerID, currentStream);
                     peersRef.current.push({ peerID: payload.callerID, peer });
                     setPeers((prev) => [...prev, { peerID: payload.callerID, peer }]);
                 });
 
-                // 5. Complete Handshake
                 socketRef.current.on('receiving-returned-signal', (payload) => {
                     const item = peersRef.current.find((p) => p.peerID === payload.id);
                     if (item) item.peer.signal(payload.signal);
                 });
 
-                // 6. CHAT LISTENER: This handles receiving messages
+                // CHAT: Receiving messages from server
                 socketRef.current.on('receive-message', (data) => {
                     setMessages((prev) => [...prev, data]);
                 });
 
-                // 7. Cleanup
+                // Cleanup when someone leaves
                 socketRef.current.on('user-left', (id) => {
                     const peerObj = peersRef.current.find((p) => p.peerID === id);
                     if (peerObj) peerObj.peer.destroy();
@@ -72,12 +74,14 @@ export const RoomProvider = ({ children }) => {
                     setPeers(updatedPeers);
                 });
             })
-            .catch((err) => console.error("Access Denied:", err));
+            .catch((err) => {
+                console.error("Camera Access Denied:", err);
+                alert("Please allow camera access to join the call.");
+            });
     };
 
     const sendMessage = (roomId, text, userName) => {
         if (text.trim() && socketRef.current) {
-            // Emitting the message to the server
             socketRef.current.emit('send-message', {
                 roomId,
                 message: text,
@@ -86,7 +90,7 @@ export const RoomProvider = ({ children }) => {
         }
     };
 
-    // WebRTC Peer Helpers
+    // Peer helper functions
     function createPeer(userToSignal, callerID, stream) {
         const peer = new Peer({ initiator: true, trickle: false, stream });
         peer.on('signal', (signal) => {
@@ -104,7 +108,6 @@ export const RoomProvider = ({ children }) => {
         return peer;
     }
 
-    // Media Toggle Logic
     const toggleAudio = () => {
         if (stream) {
             stream.getAudioTracks()[0].enabled = !stream.getAudioTracks()[0].enabled;
@@ -123,7 +126,7 @@ export const RoomProvider = ({ children }) => {
         <RoomContext.Provider value={{
             stream, peers, userVideo, joinRoom,
             messages, sendMessage, toggleAudio, toggleVideo,
-            isMuted, isCameraOff
+            isMuted, isCameraOff, BACKEND_URL // Exporting URL for fetch calls
         }}>
             {children}
         </RoomContext.Provider>
