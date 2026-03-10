@@ -2,8 +2,11 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
+// Use this specific require for uuid
+const { v4: uuidv4 } = require('uuid'); 
 const RoomManager = require('./RoomManager');
+
+// ... (the rest of your index.js code remains exactly the same)
 
 // 1. Initialize Express
 const app = express();
